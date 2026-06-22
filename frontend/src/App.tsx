@@ -7,6 +7,10 @@ import { ProjectsPage } from './pages/ProjectsPage';
 import { ProjectDetailPage } from './pages/ProjectDetailPage';
 import { DefectDetailPage } from './pages/DefectDetailPage';
 import { TestRunPage } from './pages/TestRunPage';
+import { PipelinePage } from './pages/PipelinePage';
+import { PipelineDetailPage } from './pages/PipelineDetailPage';
+import { PipelineExecutionPage } from './pages/PipelineExecutionPage';
+import { PipelineCodePage } from './pages/PipelineCodePage';
 import type { ReactNode } from 'react';
 
 interface ProtectedRouteProps {
@@ -40,6 +44,10 @@ export default function App() {
         <Route path="/projects/:id" element={<ProjectDetailPage />} />
         <Route path="/defects/:id" element={<DefectDetailPage />} />
         <Route path="/test-runs/:id" element={<TestRunPage />} />
+        <Route path="/pipeline" element={<PipelinePage />} />
+        <Route path="/pipeline/:id" element={<PipelineDetailPage />} />
+        <Route path="/pipeline/:id/executions" element={<PipelineExecutionPage />} />
+        <Route path="/pipeline/:id/code" element={<PipelineCodePage />} />
       </Route>
 
       {/* Default redirect */}

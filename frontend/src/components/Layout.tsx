@@ -5,6 +5,7 @@ import {
   FolderKanban,
   LogOut,
   Brain,
+  Workflow,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
@@ -18,6 +19,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
   { to: '/projects', label: 'Projects', icon: <FolderKanban size={18} /> },
+  { to: '/pipeline', label: 'QA Pipeline', icon: <Workflow size={18} /> },
 ];
 
 export function Layout() {

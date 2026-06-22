@@ -22,6 +22,10 @@ export function clearToken(): void {
   _token = null;
 }
 
+export function getToken(): string {
+  return _token ?? '';
+}
+
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL ?? '/api',
   headers: { 'Content-Type': 'application/json' },

@@ -1,0 +1,14 @@
+package com.testmind.model;
+
+public enum PipelineStatus {
+    STAGE_1_INGESTING,
+    STAGE_2_ANALYZING,
+    STAGE_3_GENERATING,
+    AWAITING_APPROVAL,
+    STAGE_4_EXECUTING,
+    STAGE_5_ANALYZING_RESULTS,
+    STAGE_6_GENERATING_CODE,
+    STAGE_7_CI_CD,
+    COMPLETED,
+    FAILED
+}
