@@ -1,0 +1,116 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-testmind}
+      POSTGRES_USER: ${POSTGRES_USER:-testmind}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?DB password required}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-testmind}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [testmind]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    networks: [testmind]
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-testmind}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-testmind}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?JWT secret required}
+      AI_ENGINE_URL: http://ai-engine:8001
+      REDIS_HOST: redis
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks: [testmind]
+
+  ai-engine:
+    build:
+      context: ./ai-engine
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      GROQ_API_KEY: ${GROQ_API_KEY:?Groq API key required}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      JIRA_URL: ${JIRA_URL:-}
+      JIRA_EMAIL: ${JIRA_EMAIL:-}
+      JIRA_API_TOKEN: ${JIRA_API_TOKEN:-}
+      SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN:-}
+      SLACK_TEAM_ID: ${SLACK_TEAM_ID:-}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-testmind}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-testmind}
+    ports:
+      - "8001:8001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks: [testmind]
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:8080
+        VITE_WS_URL: ws://localhost:8080
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+    networks: [testmind]
+
+  mcp-playwright:
+    image: mcr.microsoft.com/playwright:v1.44.0-jammy
+    command: npx @playwright/mcp@latest --headless --port 8931
+    restart: unless-stopped
+    ports:
+      - "8931:8931"
+    networks: [testmind]
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "80:80"
+    depends_on:
+      - frontend
+      - backend
+    networks: [testmind]
+
+volumes:
+  pgdata:
+
+networks:
+  testmind:
+    driver: bridge

@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Prism.js theme override — dark code blocks */
+code[class*='language-'],
+pre[class*='language-'] {
+  color: #cdd6f4;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+}
+
+.token.keyword { color: #cba6f7; }
+.token.string { color: #a6e3a1; }
+.token.comment { color: #6c7086; font-style: italic; }
+.token.function { color: #89b4fa; }
+.token.number { color: #fab387; }
+.token.operator { color: #89dceb; }
+.token.punctuation { color: #bac2de; }
+.token.class-name { color: #f9e2af; }

@@ -1,0 +1,40 @@
+# Environment
+.env
+*.env.local
+
+# Java
+target/
+*.jar
+*.class
+.mvn/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+dist/
+.pytest_cache/
+.coverage
+
+# Node
+node_modules/
+dist/
+.next/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Test artifacts
+playwright-report/
+test-results/
+
+# Logs
+*.log
+logs/
+
+# Docker
+.docker/
