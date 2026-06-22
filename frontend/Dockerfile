@@ -7,6 +7,12 @@ WORKDIR /app
 COPY package.json ./
 RUN npm install
 
+# Accept build-time API URLs (baked into the Vite bundle)
+ARG VITE_API_URL=http://localhost:8080
+ARG VITE_WS_URL=ws://localhost:8080
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_WS_URL=$VITE_WS_URL
+
 # Copy source and build
 COPY . .
 RUN npm run build
