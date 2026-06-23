@@ -8,8 +8,13 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, demoLogin } = useAuth();
   const navigate = useNavigate();
+
+  const handleDemo = () => {
+    demoLogin();
+    navigate('/dashboard');
+  };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -80,7 +85,26 @@ export function LoginPage() {
           <h2 className="text-2xl font-bold text-gray-900">Sign in to your account</h2>
           <p className="mt-1 text-sm text-gray-500">Enter your credentials to access the dashboard</p>
 
-          <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+          {/* Demo access — no backend required */}
+          <div className="mt-6 p-4 rounded-xl bg-blue-50 border border-blue-200">
+            <p className="text-sm font-medium text-blue-800 mb-1">Try the demo instantly</p>
+            <p className="text-xs text-blue-600 mb-3">Access the full dashboard without any credentials. No account needed.</p>
+            <button
+              type="button"
+              onClick={handleDemo}
+              className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors text-sm"
+            >
+              Enter as Demo Admin
+            </button>
+          </div>
+
+          <div className="mt-5 flex items-center gap-3">
+            <div className="flex-1 h-px bg-gray-200" />
+            <span className="text-xs text-gray-400">or sign in with your account</span>
+            <div className="flex-1 h-px bg-gray-200" />
+          </div>
+
+          <form onSubmit={handleSubmit} className="mt-5 space-y-5">
             {error && (
               <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700">
                 <AlertCircle size={16} className="shrink-0" />
@@ -94,13 +118,13 @@ export function LoginPage() {
               </label>
               <input
                 id="email"
-                type="email"
+                type="text"
                 autoComplete="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none text-sm text-gray-900 bg-white transition"
-                placeholder="you@company.com"
+                placeholder="admin@qaip.io or admin"
               />
             </div>
 

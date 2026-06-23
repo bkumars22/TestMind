@@ -11,6 +11,7 @@ interface UseAuthReturn {
   user: User | null;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
+  demoLogin: () => void;
   logout: () => void;
 }
 
@@ -68,6 +69,15 @@ export function useAuth(): UseAuthReturn {
     notifyListeners();
   }, []);
 
+  const demoLogin = useCallback((): void => {
+    const demoToken = 'demo-token-qaip-2026';
+    const demoUser: User = { id: 0, email: 'admin@qaip.io', role: 'ADMIN' as UserRole };
+    setToken(demoToken);
+    saveToStorage(demoToken, demoUser);
+    _authState = { user: demoUser, isAuthenticated: true };
+    notifyListeners();
+  }, []);
+
   const logout = useCallback((): void => {
     clearToken();
     clearStorage();
@@ -79,6 +89,7 @@ export function useAuth(): UseAuthReturn {
     user: _authState.user,
     isAuthenticated: _authState.isAuthenticated,
     login,
+    demoLogin,
     logout,
   };
 }
