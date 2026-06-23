@@ -10,6 +10,18 @@ import type {
   DashboardStats,
   McpServerType,
 } from '../types';
+import {
+  DEMO_TOKEN,
+  mockProjects,
+  mockTestRuns,
+  mockDefects,
+  mockRiskScores,
+  mockMcpStatus,
+  mockDashboardStats,
+  getAllMockDefects,
+  getMockTestRun,
+  getMockDefect,
+} from './mockData';
 
 // Module-level token store — NOT localStorage
 let _token: string | null = null;
@@ -24,6 +36,10 @@ export function clearToken(): void {
 
 export function getToken(): string {
   return _token ?? '';
+}
+
+function isDemo(): boolean {
+  return _token === DEMO_TOKEN;
 }
 
 const api = axios.create({
@@ -62,6 +78,7 @@ export async function login(email: string, password: string): Promise<AuthRespon
 
 // Projects
 export async function getProjects(): Promise<Project[]> {
+  if (isDemo()) return Promise.resolve(mockProjects);
   const { data } = await api.get<Project[]>('/projects');
   return data;
 }
@@ -71,58 +88,97 @@ export async function createProject(payload: {
   repoUrl: string;
   githubToken: string;
 }): Promise<Project> {
+  if (isDemo()) {
+    const newProject: Project = {
+      id: Date.now(),
+      name: payload.name,
+      repoUrl: payload.repoUrl,
+      techStack: '',
+      status: 'ACTIVE',
+      githubToken: payload.githubToken,
+      createdAt: new Date().toISOString(),
+      activeTestRun: false,
+    };
+    mockProjects.push(newProject);
+    return Promise.resolve(newProject);
+  }
   const { data } = await api.post<Project>('/projects', payload);
   return data;
 }
 
 export async function deleteProject(id: number): Promise<void> {
+  if (isDemo()) return Promise.resolve();
   await api.delete(`/projects/${id}`);
 }
 
 export async function connectRepo(id: number, token: string): Promise<void> {
+  if (isDemo()) return Promise.resolve();
   await api.post(`/projects/${id}/connect-repo`, { token });
 }
 
 export async function triggerAnalysis(id: number): Promise<{ runId: number }> {
+  if (isDemo()) return Promise.resolve({ runId: id * 100 });
   const { data } = await api.post<{ runId: number }>(`/projects/${id}/analyze`);
   return data;
 }
 
 // Test Runs
 export async function getTestRuns(projectId: number): Promise<TestRun[]> {
+  if (isDemo()) return Promise.resolve(mockTestRuns[projectId] ?? []);
   const { data } = await api.get<TestRun[]>(`/projects/${projectId}/test-runs`);
   return data;
 }
 
 export async function getTestRun(id: number): Promise<TestRun> {
+  if (isDemo()) {
+    const run = getMockTestRun(id);
+    if (run) return Promise.resolve(run);
+    return Promise.reject(new Error('Test run not found'));
+  }
   const { data } = await api.get<TestRun>(`/test-runs/${id}`);
   return data;
 }
 
 // Defects
 export async function getDefects(runId: number): Promise<Defect[]> {
+  if (isDemo()) return Promise.resolve(mockDefects[runId] ?? []);
   const { data } = await api.get<Defect[]>(`/test-runs/${runId}/defects`);
   return data;
 }
 
 export async function getDefect(id: number): Promise<Defect> {
+  if (isDemo()) {
+    const defect = getMockDefect(id);
+    if (defect) return Promise.resolve(defect);
+    return Promise.reject(new Error('Defect not found'));
+  }
   const { data } = await api.get<Defect>(`/defects/${id}`);
   return data;
 }
 
 export async function updateDefectStatus(id: number, status: DefectStatus): Promise<Defect> {
+  if (isDemo()) {
+    const defect = getMockDefect(id);
+    if (defect) {
+      defect.status = status;
+      return Promise.resolve(defect);
+    }
+    return Promise.reject(new Error('Defect not found'));
+  }
   const { data } = await api.patch<Defect>(`/defects/${id}/status`, { status });
   return data;
 }
 
 // Risk Scores
 export async function getRiskScores(projectId: number): Promise<RiskScore[]> {
+  if (isDemo()) return Promise.resolve(mockRiskScores[projectId] ?? []);
   const { data } = await api.get<RiskScore[]>(`/projects/${projectId}/risk-scores`);
   return data;
 }
 
 // MCP
 export async function getMcpStatus(projectId: number): Promise<McpStatus[]> {
+  if (isDemo()) return Promise.resolve(mockMcpStatus[projectId] ?? []);
   const { data } = await api.get<McpStatus[]>(`/projects/${projectId}/mcp-status`);
   return data;
 }
@@ -131,17 +187,27 @@ export async function configureMcp(
   projectId: number,
   payload: { serverType: McpServerType; config: Record<string, string> }
 ): Promise<void> {
+  if (isDemo()) return Promise.resolve();
   await api.post(`/projects/${projectId}/mcp-config`, payload);
 }
 
 // Dashboard
 export async function getDashboardStats(): Promise<DashboardStats> {
+  if (isDemo()) return Promise.resolve(mockDashboardStats);
   const { data } = await api.get<DashboardStats>('/dashboard/stats');
   return data;
 }
 
 export async function getRiskHeatmap(projectId: number): Promise<RiskScore[]> {
+  if (isDemo()) return Promise.resolve(mockRiskScores[projectId] ?? []);
   const { data } = await api.get<RiskScore[]>(`/projects/${projectId}/risk-heatmap`);
+  return data;
+}
+
+// All defects (used by defects list page)
+export async function getAllDefects(): Promise<Defect[]> {
+  if (isDemo()) return Promise.resolve(getAllMockDefects());
+  const { data } = await api.get<Defect[]>('/defects');
   return data;
 }
 
