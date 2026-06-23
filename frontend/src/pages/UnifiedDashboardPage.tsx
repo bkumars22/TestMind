@@ -128,7 +128,7 @@ export function UnifiedDashboardPage() {
       {/* Greeting */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">
-          {greeting}, {user?.name?.split(' ')[0] ?? 'there'} 👋
+          {greeting}, {user?.email?.split('@')[0] ?? 'there'} 👋
         </h1>
         <p className="text-gray-500 mt-1">QA Intelligent Platform — SCIP and ARIA are monitored here.</p>
       </div>

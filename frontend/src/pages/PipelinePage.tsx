@@ -82,7 +82,10 @@ export function PipelinePage() {
   const { data: runs = [], isLoading } = useQuery<PipelineRun[]>({
     queryKey: ['pipeline-runs', filterProjectId],
     queryFn: () => pipelineApi.list(filterProjectId),
-    refetchInterval: runs.some((r) => isRunning(r.status)) ? 5_000 : false,
+    refetchInterval: (query) =>
+      (query.state.data as PipelineRun[] | undefined)?.some((r) => isRunning(r.status))
+        ? 5_000
+        : false,
   });
 
   const startMutation = useMutation({

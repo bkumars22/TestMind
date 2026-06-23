@@ -9,9 +9,12 @@ interface CodeFile {
   testCaseId?: number;
   framework: string;
   language: string;
-  fileName: string;
-  filePath: string;
-  codeContent: string;
+  filename: string;
+  content: string;
+  // legacy aliases kept for template refs below
+  fileName?: string;
+  filePath?: string;
+  codeContent?: string;
 }
 
 function CopyButton({ text }: { text: string }) {
@@ -43,14 +46,14 @@ function CodeCard({ file }: { file: CodeFile }) {
       >
         <div className="flex items-center gap-3">
           <Code2 size={16} className="text-gray-400" />
-          <span className="text-sm font-mono font-medium text-gray-800">{file.fileName}</span>
+          <span className="text-sm font-mono font-medium text-gray-800">{file.filename ?? file.fileName}</span>
           <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">{file.language}</span>
         </div>
-        <CopyButton text={file.codeContent} />
+        <CopyButton text={file.content ?? file.codeContent ?? ''} />
       </div>
       {open && (
         <pre className="text-xs bg-[#1e1e2e] text-[#cdd6f4] p-4 overflow-x-auto max-h-[500px] overflow-y-auto leading-relaxed">
-          <code>{file.codeContent}</code>
+          <code>{file.content ?? file.codeContent}</code>
         </pre>
       )}
     </div>
@@ -65,7 +68,7 @@ export function PipelineCodePage() {
 
   const { data: allCode = [], isLoading } = useQuery({
     queryKey: ['pipeline-code', runId],
-    queryFn: () => pipelineApi.getGeneratedCode(runId) as Promise<CodeFile[]>,
+    queryFn: () => pipelineApi.getGeneratedCode(runId) as unknown as Promise<CodeFile[]>,
   });
 
   const { data: run } = useQuery({

@@ -827,7 +827,7 @@ export function PipelineDetailPage() {
   const showExecutions = run.currentStage >= 5;
   const showCode = run.currentStage >= 6;
 
-  const visibleTabs = TABS.filter((t, i) => {
+  const visibleTabs = TABS.filter((_t, i) => {
     if (i === 0) return showStory;
     if (i === 1) return showGaps;
     if (i === 2) return showTestCases;

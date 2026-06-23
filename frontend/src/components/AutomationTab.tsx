@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  Zap, Link2, CheckCircle2, XCircle, Clock, Play,
-  Download, Copy, ChevronDown, ChevronRight, AlertTriangle,
+  Zap, Link2, CheckCircle2, XCircle, Play,
+  Download, Copy, ChevronDown, ChevronRight,
 } from 'lucide-react';
 import { automationApi } from '../services/automationApi';
 import type { FrameworkProfile, AutomationExecution, AutomationResult } from '../services/automationApi';

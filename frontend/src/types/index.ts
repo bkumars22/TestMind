@@ -8,6 +8,7 @@ export interface User {
   id: number;
   email: string;
   role: UserRole;
+  name?: string;
 }
 
 export interface AuthResponse {
@@ -15,12 +16,16 @@ export interface AuthResponse {
   refreshToken: string;
   email: string;
   role: UserRole;
+  name?: string;
 }
 
 export interface Project {
   id: number;
   name: string;
-  repoUrl: string;
+  repoUrl?: string;
+  techStack?: string;
+  status?: string;
+  githubToken?: string;
   createdAt: string;
   activeTestRun: boolean;
 }
