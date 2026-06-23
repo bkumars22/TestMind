@@ -34,6 +34,31 @@ Pre-loaded with SCIP and ARIA as registered projects, 4 defects, 6 risk scores, 
 
 ---
 
+## Screenshots
+
+### Login — Demo Admin access, no credentials needed
+![Login](github-docs/screenshots/00-login.png)
+
+### Dashboard — SCIP and ARIA monitored, live KPIs
+![Dashboard](github-docs/screenshots/01-dashboard.png)
+
+### SCIP Project — Risk Score Trend (Overview tab)
+![SCIP Project Detail](github-docs/screenshots/03-project-detail-scip.png)
+
+### Automation Tab — Playwright framework connected to SCIP repo
+![Automation Tab](github-docs/screenshots/04-automation-tab.png)
+
+### MCP Status — All 5 servers, live connection state
+![MCP Status](github-docs/screenshots/05-mcp-status.png)
+
+### QA Pipeline — 4 runs across SCIP and ARIA
+![QA Pipeline](github-docs/screenshots/06-pipeline.png)
+
+### ARIA Project — Risk Score Trend (Overview tab)
+![ARIA Project Detail](github-docs/screenshots/08-project-detail-aria.png)
+
+---
+
 ## What is QAIP?
 
 QA Intelligent Platform is an AI-native QA umbrella over your live projects. It connects to any GitHub repo, scores every file for risk using IsolationForest ML, generates missing Playwright tests via a 7-stage LangGraph agent, explains defects in plain English, raises Jira tickets, and posts Slack alerts — all triggered automatically on every git push.
