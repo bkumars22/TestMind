@@ -18,7 +18,6 @@ import {
   getRiskScores,
   getMcpStatus,
   configureMcp,
-  triggerAnalysis,
 } from '../services/api';
 import { StatusBadge } from '../components/StatusBadge';
 import { SeverityBadge } from '../components/SeverityBadge';
@@ -61,6 +60,7 @@ export function ProjectDetailPage() {
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [severityFilter, setSeverityFilter] = useState<DefectSeverity | 'ALL'>('ALL');
   const [statusFilter, setStatusFilter] = useState<DefectStatus | 'ALL'>('ALL');
+  const [generatedForFile, setGeneratedForFile] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   const { data: projects = [] } = useQuery({ queryKey: ['projects'], queryFn: getProjects });
@@ -327,7 +327,10 @@ export function ProjectDetailPage() {
                       </span>
                     )}
                     <button
-                      onClick={() => { void triggerAnalysis(projectId); }}
+                      onClick={() => {
+                        setGeneratedForFile(rs.filePath);
+                        setActiveTab('automation');
+                      }}
                       className="shrink-0 px-3 py-1.5 text-xs font-medium text-brand-600 border border-brand-200 hover:bg-brand-50 rounded-lg transition-colors"
                     >
                       Generate Tests
@@ -342,7 +345,7 @@ export function ProjectDetailPage() {
 
       {/* Tab: Automation */}
       {activeTab === 'automation' && (
-        <AutomationTab projectId={projectId} projectRepoUrl={project?.repoUrl} />
+        <AutomationTab projectId={projectId} projectRepoUrl={project?.repoUrl} suggestedFile={generatedForFile} />
       )}
 
       {/* Tab: MCP Status */}

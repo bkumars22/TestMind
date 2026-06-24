@@ -30,7 +30,10 @@ public class ProjectService {
 
     @Transactional(readOnly = true)
     public List<ProjectResponse> getAll(User user) {
-        return projectRepository.findByUser(user).stream()
+        List<Project> projects = user.getRole() == UserRole.ADMIN
+                ? projectRepository.findAll()
+                : projectRepository.findByUser(user);
+        return projects.stream()
                 .map(project -> toResponse(project, hasActiveRun(project)))
                 .collect(Collectors.toList());
     }
@@ -118,7 +121,7 @@ public class ProjectService {
         Project project = projectRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Project", id));
 
-        if (!project.getUser().getId().equals(user.getId())) {
+        if (user.getRole() != UserRole.ADMIN && !project.getUser().getId().equals(user.getId())) {
             throw new org.springframework.security.access.AccessDeniedException(
                     "You do not own this project");
         }
@@ -136,6 +139,8 @@ public class ProjectService {
                 .id(project.getId())
                 .name(project.getName())
                 .repoUrl(project.getRepoUrl())
+                .techStack(project.getTechStack())
+                .status(project.getStatus())
                 .createdAt(project.getCreatedAt())
                 .activeTestRun(activeTestRun)
                 .build();

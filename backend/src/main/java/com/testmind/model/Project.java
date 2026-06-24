@@ -26,8 +26,17 @@ public class Project {
     // GitHub token is stored encrypted at rest; never expose in API responses
     private String githubToken;
 
+    @Column(name = "tech_stack")
+    private String techStack;
+
+    @Column(name = "status")
+    private String status;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
@@ -36,5 +45,12 @@ public class Project {
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+        if (this.status == null) this.status = "ACTIVE";
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        this.updatedAt = LocalDateTime.now();
     }
 }

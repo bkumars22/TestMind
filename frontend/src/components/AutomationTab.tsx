@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Zap, Link2, CheckCircle2, XCircle, Play,
@@ -250,7 +250,15 @@ function ExecutionCard({ exec, projectId }: { exec: AutomationExecution; project
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
-export function AutomationTab({ projectId, projectRepoUrl }: { projectId: number; projectRepoUrl?: string }) {
+export function AutomationTab({
+  projectId,
+  projectRepoUrl,
+  suggestedFile,
+}: {
+  projectId: number;
+  projectRepoUrl?: string;
+  suggestedFile?: string | null;
+}) {
   const qc = useQueryClient();
   const [selectedFw, setSelectedFw] = useState<FwType>('PLAYWRIGHT');
   const [repoUrl, setRepoUrl] = useState(projectRepoUrl ?? '');
@@ -297,8 +305,36 @@ export function AutomationTab({ projectId, projectRepoUrl }: { projectId: number
 
   const connectedProfile = profiles.find(p => p.frameworkType === selectedFw && p.status === 'CONNECTED');
 
+  // When arriving from Coverage Gaps "Generate Tests", pre-fill the form
+  useEffect(() => {
+    if (!suggestedFile) return;
+    const fileName = suggestedFile.split('/').pop() ?? suggestedFile;
+    const baseName = fileName.replace(/\.(java|py|tsx?|jsx?|cs|rb|go)$/, '');
+    setSuiteName(`${baseName} Test Suite`);
+    setTestTitles(
+      `Verify ${baseName} loads successfully\nVerify ${baseName} with valid credentials\nVerify ${baseName} with invalid input\nVerify ${baseName} access control`
+    );
+    setShowGenForm(true);
+    if (connectedProfile) setGenProfileId(connectedProfile.id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [suggestedFile]);
+
   return (
     <div className="space-y-6">
+      {/* File-specific generation banner */}
+      {suggestedFile && (
+        <div className="p-3 bg-brand-50 border border-brand-200 rounded-lg flex items-start gap-2 text-sm">
+          <Zap size={15} className="text-brand-600 shrink-0 mt-0.5" />
+          <div>
+            <span className="font-medium text-brand-800">Generating tests for: </span>
+            <span className="font-mono text-brand-700 break-all">{suggestedFile}</span>
+            <p className="text-xs text-brand-600 mt-0.5">
+              Suite name and test titles are pre-filled below. Connect a framework first, then click Generate.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Framework selector */}
       <div className="bg-white border border-gray-200 rounded-xl p-6">
         <h3 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2">
