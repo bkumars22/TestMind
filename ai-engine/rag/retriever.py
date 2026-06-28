@@ -7,7 +7,9 @@ retrieve_for_file(project_id, file_path) — main entry point.
 retrieve_similar_defects(project_id, defect_title) — for explain_and_score.
   Pulls similar past defects so the LLM can see how we explained them before.
 
-query(project_id, question) — natural-language search over all stored docs.
+query(project_id, question, hybrid=True) — natural-language search.
+  hybrid=True  → BM25 + dense, fused via RRF  (Prompt 6)
+  hybrid=False → dense-only (original behaviour)
 """
 
 from __future__ import annotations
@@ -17,6 +19,7 @@ from typing import Any
 
 from .embedder import embed
 from .vector_store import search
+from .hybrid_search import hybrid_search
 
 logger = logging.getLogger("rag.retriever")
 
@@ -73,8 +76,25 @@ def query(
     question: str,
     top_k: int = 5,
     source_type: str | None = None,
+    hybrid: bool = True,
 ) -> list[dict[str, Any]]:
-    """Open-ended NL search over all stored QAIP documents."""
+    """Open-ended NL search over all stored QAIP documents.
+
+    hybrid=True  — BM25 + dense fused via RRF (default, Prompt 6)
+    hybrid=False — dense-only (original behaviour)
+    """
+    if hybrid:
+        try:
+            return hybrid_search(
+                query=question,
+                project_id=project_id,
+                top_k=top_k,
+                source_type=source_type,
+            )
+        except Exception as exc:
+            logger.warning("hybrid_search failed, falling back to dense: %s", exc)
+
+    # Dense-only path (fallback or explicit)
     try:
         q_embed = embed(question)
         return search(

@@ -1138,6 +1138,72 @@ class JiraIngestRequest(BaseModel):
     story_type: str = "Story"
 
 
+class HybridSearchRequest(BaseModel):
+    query:       str           = Field(..., description="Search query")
+    project_id:  int           = Field(..., description="QAIP project ID")
+    top_k:       int           = Field(8, ge=1, le=50)
+    source_type: str | None    = Field(None, description="Filter: test_case | defect | jira_story | run_result")
+    hybrid:      bool          = Field(True, description="True=BM25+dense RRF, False=dense only")
+
+
+@app.post("/rag/hybrid-search")
+async def rag_hybrid_search(payload: HybridSearchRequest):
+    """
+    Hybrid search: BM25 (keyword) + dense (semantic) fused via Reciprocal Rank Fusion.
+
+    Each result includes:
+      content, metadata, source_type,
+      dense_score  — cosine similarity (0–1),
+      bm25_score   — normalised BM25 score (0–1),
+      rrf_score    — fused RRF score,
+      found_by     — 'both' | 'dense' | 'bm25'
+    """
+    from rag.hybrid_search import hybrid_search
+    from rag.retriever import query as dense_query
+
+    loop = asyncio.get_running_loop()
+
+    if payload.hybrid:
+        results = await loop.run_in_executor(
+            _executor,
+            lambda: hybrid_search(
+                query=payload.query,
+                project_id=payload.project_id,
+                top_k=payload.top_k,
+                source_type=payload.source_type,
+            ),
+        )
+        mode = "hybrid_rrf"
+    else:
+        results = await loop.run_in_executor(
+            _executor,
+            lambda: dense_query(
+                project_id=payload.project_id,
+                question=payload.query,
+                top_k=payload.top_k,
+                source_type=payload.source_type,
+                hybrid=False,
+            ),
+        )
+        mode = "dense_only"
+
+    both_count  = sum(1 for r in results if r.get("found_by") == "both")
+    dense_count = sum(1 for r in results if r.get("found_by") == "dense")
+    bm25_count  = sum(1 for r in results if r.get("found_by") == "bm25")
+
+    return {
+        "query":       payload.query,
+        "mode":        mode,
+        "count":       len(results),
+        "results":     results,
+        "stats": {
+            "found_by_both":  both_count,
+            "dense_only":     dense_count,
+            "bm25_only":      bm25_count,
+        },
+    }
+
+
 class AgenticRAGRequest(BaseModel):
     question:    str  = Field(..., description="Natural-language question")
     project_id:  int  = Field(..., description="QAIP project ID")
@@ -1176,6 +1242,7 @@ async def rag_ingest(payload: RagIngestRequest):
     try:
         from rag.embedder import embed
         from rag.vector_store import upsert, ensure_schema
+        from rag.bm25_index import invalidate as bm25_invalidate
 
         ensure_schema()
         embedding = embed(payload.content)
@@ -1187,6 +1254,8 @@ async def rag_ingest(payload: RagIngestRequest):
             project_id=str(payload.project_id),
             metadata=payload.metadata,
         )
+        # Invalidate BM25 cache so next search picks up the new document
+        bm25_invalidate(str(payload.project_id), payload.source_type)
         return {"status": "ok", "id": doc_id}
     except Exception as exc:
         logger.warning("RAG ingest failed: %s", exc)

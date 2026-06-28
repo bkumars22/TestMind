@@ -6,6 +6,7 @@ import { getProjects, getDashboardStats, triggerAnalysis } from '../services/api
 import { useAuth } from '../hooks/useAuth';
 import type { Project } from '../types';
 import AgenticRAGChat from '../components/AgenticRAGChat';
+import HybridSearchPanel from '../components/HybridSearchPanel';
 
 // ─── Single project card ──────────────────────────────────────────────────────
 function ProjectCard({ project, accent }: { project: Project; accent: string }) {
@@ -202,6 +203,12 @@ export function UnifiedDashboardPage() {
         <div className="h-[520px]">
           <AgenticRAGChat projectId={projects[0]?.id ?? 1} />
         </div>
+      </section>
+
+      {/* Hybrid Search (BM25 + Dense) */}
+      <section>
+        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Hybrid Search</h2>
+        <HybridSearchPanel projectId={projects[0]?.id ?? 1} />
       </section>
 
       {/* Loading skeleton */}
