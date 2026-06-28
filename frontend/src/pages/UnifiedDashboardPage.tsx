@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Play, ExternalLink, CheckCircle, AlertCircle, Clock, Zap } from 'lucide-react';
 import { getProjects, getDashboardStats, triggerAnalysis } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import type { Project } from '../types';
+import AgenticRAGChat from '../components/AgenticRAGChat';
 
 // ─── Single project card ──────────────────────────────────────────────────────
 function ProjectCard({ project, accent }: { project: Project; accent: string }) {
@@ -193,6 +195,14 @@ export function UnifiedDashboardPage() {
           </button>
         </div>
       )}
+
+      {/* Agentic RAG knowledge chat */}
+      <section>
+        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">QA Knowledge Search</h2>
+        <div className="h-[520px]">
+          <AgenticRAGChat projectId={projects[0]?.id ?? 1} />
+        </div>
+      </section>
 
       {/* Loading skeleton */}
       {isLoading && (
