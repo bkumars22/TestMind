@@ -1,0 +1,127 @@
+# NeMo Guardrails configuration for QAIP AI Engine
+# Inspired by NVIDIA NeMo Guardrails (Colang 2.0 config schema)
+#
+# Tier 1 — instant regex pattern checks (zero latency, zero LLM cost)
+# Tier 2 — LLM topical classification (Groq fast model, borderline only)
+# Tier 3 — output content filter (regex + LLM)
+
+models:
+  main:
+    engine: groq
+    model:  llama-3.1-8b-instant   # fast model for guardrail calls
+
+rails:
+  input:
+    - check_length
+    - check_jailbreak
+    - check_prompt_injection
+    - check_pii_request
+    - check_off_topic            # LLM-based, runs only if Tier-1 all pass
+  output:
+    - check_pii_output
+    - check_sensitive_disclosure
+    - check_length_output
+
+policies:
+  max_input_chars:    2000
+  max_output_chars:   6000
+  off_topic_llm_threshold: 0.35   # confidence below this → block as off-topic
+  jailbreak_risk_score:    0.85   # risk score assigned to jailbreak blocks
+  off_topic_risk_score:    0.70
+  pii_risk_score:          0.90
+  injection_risk_score:    0.95
+  log_blocked: true
+  alert_on_jailbreak: true
+  alert_email: "swamy.kumar02@gmail.com"
+
+topics:
+  # Keywords that suggest on-topic queries (QA / testing domain)
+  allowed_keywords:
+    - test
+    - qa
+    - quality
+    - defect
+    - bug
+    - jira
+    - story
+    - sprint
+    - coverage
+    - automation
+    - selenium
+    - pytest
+    - junit
+    - risk
+    - regression
+    - integration
+    - ci
+    - cd
+    - pipeline
+    - pull request
+    - pr
+    - review
+    - repository
+    - repo
+    - commit
+    - branch
+    - merge
+    - build
+    - deploy
+    - failure
+    - pass
+    - assertion
+    - mock
+    - fixture
+    - scenario
+    - acceptance
+    - performance
+    - load
+    - security
+    - penetration
+    - vulnerability
+
+blocked_patterns:
+
+  jailbreak:
+    - "ignore\\s+(all\\s+)?(previous|your|above|prior|earlier)\\s+(instructions?|rules?|guidelines?|context|training)"
+    - "act\\s+as\\s+(if\\s+you\\s+are|a|an)\\s+(?!QA|test|engineer|developer)"
+    - "you\\s+are\\s+now\\s+(a\\s+|an\\s+)?(?!QA|test|quality)"
+    - "\\bDAN\\b|do\\s+anything\\s+now"
+    - "forget\\s+(everything|all|your)\\s+(you\\s+know|instructions|training|rules|restrictions)"
+    - "bypass\\s+(your|all|the|any)\\s+(restrictions?|rules?|guidelines?|guardrails?|safety|filters?)"
+    - "pretend\\s+(you\\s+are|to\\s+be)\\s+(?!a\\s+QA|a\\s+test)"
+    - "override\\s+(your|all|the)\\s+(safety|rules|training|guidelines|restrictions?|system)"
+    - "jailbreak|jail\\s+break"
+    - "you\\s+have\\s+no\\s+(restrictions?|limits?|rules?|guidelines?|filters?)"
+    - "developer\\s+mode|sudo\\s+mode|god\\s+mode"
+    - "prompt\\s+injection|indirect\\s+injection"
+
+  prompt_injection:
+    - "\\]\\]\\}|\\}\\}\\]"
+    - "<\\s*system\\s*>|<\\s*/\\s*system\\s*>"
+    - "<\\|im_start\\||<\\|im_end\\|"
+    - "<<SYS>>|\\[INST\\]|\\[/INST\\]"
+    - "IGNORE\\s+ABOVE|IGNORE\\s+ALL\\s+PREVIOUS"
+    - "-{4,}\\s*(NEW\\s+)?INSTRUCTIONS"
+    - "\\[SYSTEM\\]|\\[SYSTEM PROMPT\\]"
+
+  pii_request:
+    - "(show|give|list|display|print|export|dump|reveal|leak)\\s+.{0,40}(password|credential|api.?key|secret|token|private.?key)"
+    - "(select|get|fetch|retrieve|extract|query)\\s+.{0,40}(password|credential|secret|private.?key)"
+    - "database\\s+.{0,30}(password|credential|connection.?string)"
+    - "env\\s*(var|variable|file)\\s+.{0,30}(key|secret|token|password)"
+    - "what\\s+(is|are)\\s+(the\\s+)?(api\\s+key|secret|password|token|credential)"
+
+output_filters:
+
+  pii_patterns:
+    - "password\\s*[:=]\\s*\\S{3,}"
+    - "api.?key\\s*[:=]\\s*[A-Za-z0-9\\-._~+/]{8,}"
+    - "secret\\s*[:=]\\s*\\S{5,}"
+    - "Bearer\\s+[A-Za-z0-9\\-._~+/=]{10,}"
+    - "sk-[A-Za-z0-9]{20,}"              # OpenAI-style keys
+    - "lsv2_[A-Za-z0-9_]{20,}"           # LangSmith keys
+
+  sensitive_disclosure:
+    - "DATABASE_URL|POSTGRES_URL"
+    - "GROQ_API_KEY|OPENAI_API_KEY"
+    - "LANGCHAIN_API_KEY|LANGSMITH"

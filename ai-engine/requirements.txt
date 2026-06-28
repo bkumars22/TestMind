@@ -31,3 +31,6 @@ shap>=0.45.0
 
 # Hybrid Search BM25 index (Prompt 6)
 rank-bm25>=0.2.2
+
+# NeMo Guardrails config parsing (Prompt 8)
+pyyaml>=6.0.1

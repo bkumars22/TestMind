@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Search, ChevronDown, ChevronRight, Loader2, AlertCircle, CheckCircle } from 'lucide-react'
 import { RAGASBadge } from './RAGASMetricsPanel'
+import GuardrailsStatusBadge from './GuardrailsStatusBadge'
 
 const AI_ENGINE = import.meta.env.VITE_AI_ENGINE_URL ?? 'http://localhost:8001'
 
@@ -25,6 +26,16 @@ interface TraceNode {
   is_grounded?:  boolean
 }
 
+interface GuardrailsInfo {
+  passed:          boolean
+  rail_triggered?: string | null
+  risk_score?:     number
+  blocked_reason?: string | null
+  input_latency?:  number
+  output_latency?: number
+  latency_ms?:     number
+}
+
 interface RAGResult {
   answer:        string
   sources:       Source[]
@@ -33,6 +44,8 @@ interface RAGResult {
   is_grounded:   boolean
   trace:         TraceNode[]
   ragas_metrics: Record<string, number> | null
+  blocked?:      boolean
+  guardrails?:   GuardrailsInfo | null
 }
 
 interface Message {
@@ -282,6 +295,12 @@ export default function AgenticRAGChat({ projectId }: Props) {
                               ))}
                             </div>
                           )}
+
+                          {/* Guardrails status */}
+                          <GuardrailsStatusBadge
+                            guardrails={msg.result.guardrails ?? null}
+                            blocked={msg.result.blocked}
+                          />
 
                           {/* RAGAS quality badges */}
                           {msg.result.ragas_metrics && (
