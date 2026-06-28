@@ -2,29 +2,35 @@
 QA Intelligent Platform (AI-Driven) — AI Engine FastAPI entry point.
 
 Endpoints:
-  POST /analyze          — trigger full 7-node LangGraph agent
-  GET  /status/{run_id}  — poll run status
-  POST /explain          — explain a single defect
-  POST /generate-tests   — generate tests for a specific file
-  GET  /health           — health check
+  POST /analyze            — trigger full 7-node LangGraph agent (v1, poll-based)
+  POST /analyze/v2         — v2 agent: parallel branches + PostgreSQL checkpointing
+  GET  /stream/{run_id}    — SSE stream of node progress events for any v2 run
+  POST /analyze/resume/{run_id} — resume a checkpointed v2 run from last node
+  GET  /status/{run_id}    — poll run status
+  POST /explain            — explain a single defect
+  POST /generate-tests     — generate tests for a specific file
+  GET  /health             — health check
 """
 
+import json
 import os
 import uuid
 import time
 import asyncio
 import logging
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from groq import Groq
 
 from agents.langgraph_agent import build_graph, AgentState
+from agents.qaip_pipeline_v2 import build_graph_v2, get_checkpointer, PIPELINE_NODES
 from model_router import get_router, ModelTier
 from cost_tracker import record as track_cost, dashboard as cost_dashboard
 from quality_validator import (
@@ -34,11 +40,15 @@ from quality_validator import (
     validate,
     QUALITY_THRESHOLD,
 )
+import stream_bus
 
 load_dotenv()
 
 # Shared router instance for this service
 _router = get_router("QAIP")
+
+# Thread pool for running sync graph in background without blocking event loop
+_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="qaip-v2")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -79,6 +89,12 @@ app = FastAPI(
     description="LangGraph-powered QA intelligence service",
     version="2.0.0",
 )
+
+
+@app.on_event("startup")
+async def _startup():
+    stream_bus.set_loop(asyncio.get_running_loop())
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -227,6 +243,164 @@ async def get_status(run_id: str):
     if not record:
         raise HTTPException(status_code=404, detail=f"Run ID '{run_id}' not found.")
     return record
+
+
+# ---------------------------------------------------------------------------
+# V2: parallel pipeline + PostgreSQL checkpointing + SSE streaming
+# ---------------------------------------------------------------------------
+
+def _run_agent_v2(run_id: str, initial_state: AgentState) -> None:
+    """Run the v2 graph in a thread-pool thread."""
+    try:
+        run_store[run_id]["status"] = "RUNNING"
+        checkpointer = get_checkpointer()
+        graph = build_graph_v2(checkpointer)
+        config: dict = {}
+        if checkpointer:
+            config = {"configurable": {"thread_id": run_id}}
+        final: AgentState = graph.invoke(initial_state, config=config)
+        run_store[run_id].update({
+            "status":           final.get("status", "COMPLETED"),
+            "error":            final.get("error", ""),
+            "risk_scores":      final.get("risk_scores", []),
+            "coverage_gaps":    final.get("coverage_gaps", []),
+            "generated_tests":  final.get("generated_tests", []),
+            "defects":          final.get("defects", []),
+            "explained_defects":final.get("explained_defects", []),
+            "dispatch_results": final.get("dispatch_results", {}),
+        })
+        stream_bus.push(run_id, {"event": "done", "status": run_store[run_id]["status"], "ts": time.time()})
+    except Exception as exc:
+        logger.exception("V2 agent run %s failed: %s", run_id, exc)
+        run_store[run_id]["status"] = "FAILED"
+        run_store[run_id]["error"]  = str(exc)
+        stream_bus.push(run_id, {"event": "error", "error": str(exc), "ts": time.time()})
+    finally:
+        stream_bus.deregister(run_id)
+
+
+@app.post("/analyze/v2", response_model=AnalyzeResponse)
+async def analyze_v2(payload: AnalyzeRequest):
+    """
+    V2 analysis: parallel score_risk + identify_gaps, PostgreSQL checkpointing.
+    Subscribe to GET /stream/{run_id} for live SSE progress events.
+    """
+    run_id = str(uuid.uuid4())
+    initial_state: AgentState = {
+        "run_id":          run_id,
+        "project_id":      payload.project_id,
+        "repo_url":        payload.repo_url,
+        "github_token":    payload.github_token,
+        "commit_sha":      payload.commit_sha,
+        "file_list":       [],
+        "risk_scores":     [],
+        "coverage_gaps":   [],
+        "rag_context":     [],
+        "generated_tests": [],
+        "defects":         [],
+        "explained_defects": [],
+        "dispatch_results":  {},
+        "error":           "",
+        "status":          "QUEUED",
+    }
+    run_store[run_id] = {"run_id": run_id, "project_id": payload.project_id, "status": "QUEUED", "error": ""}
+
+    # Register SSE queue before handing off to thread (avoids a race)
+    stream_bus.register(run_id)
+    loop = asyncio.get_running_loop()
+    loop.run_in_executor(_executor, _run_agent_v2, run_id, initial_state)
+
+    logger.info("Queued v2 run %s for project %s", run_id, payload.project_id)
+    return AnalyzeResponse(
+        run_id=run_id,
+        status="QUEUED",
+        message="V2 analysis queued. Stream progress at GET /stream/{run_id}.",
+    )
+
+
+@app.post("/analyze/resume/{run_id}", response_model=AnalyzeResponse)
+async def resume_run(run_id: str, payload: AnalyzeRequest):
+    """
+    Resume a checkpointed v2 run from the last completed node.
+    Requires DATABASE_URL to be configured (PostgresSaver).
+    """
+    checkpointer = get_checkpointer()
+    if checkpointer is None:
+        raise HTTPException(status_code=503, detail="Checkpointing unavailable — set DATABASE_URL.")
+
+    initial_state: AgentState = {
+        "run_id":          run_id,
+        "project_id":      payload.project_id,
+        "repo_url":        payload.repo_url,
+        "github_token":    payload.github_token,
+        "commit_sha":      payload.commit_sha,
+        "file_list":       [],
+        "risk_scores":     [],
+        "coverage_gaps":   [],
+        "rag_context":     [],
+        "generated_tests": [],
+        "defects":         [],
+        "explained_defects": [],
+        "dispatch_results":  {},
+        "error":           "",
+        "status":          "RESUMING",
+    }
+    run_store[run_id] = {"run_id": run_id, "project_id": payload.project_id, "status": "RESUMING", "error": ""}
+    stream_bus.register(run_id)
+    loop = asyncio.get_running_loop()
+    loop.run_in_executor(_executor, _run_agent_v2, run_id, initial_state)
+
+    return AnalyzeResponse(
+        run_id=run_id,
+        status="RESUMING",
+        message=f"Resuming run {run_id} from last checkpoint.",
+    )
+
+
+@app.get("/stream/{run_id}")
+async def stream_progress(run_id: str):
+    """
+    SSE stream of node progress events for a v2 run.
+
+    Event types:
+      node_start  — node began execution
+      node_done   — node completed
+      node_error  — node threw an exception
+      done        — entire pipeline finished
+      error       — pipeline-level failure
+    """
+    q = stream_bus.register(run_id)  # safe to call even if already registered
+
+    async def generator():
+        # Send pipeline topology first so the UI can render the DAG immediately
+        yield f"data: {json.dumps({'event': 'topology', 'nodes': PIPELINE_NODES})}\n\n"
+        try:
+            while True:
+                try:
+                    event = await asyncio.wait_for(q.get(), timeout=120.0)
+                except asyncio.TimeoutError:
+                    yield "data: {\"event\": \"keepalive\"}\n\n"
+                    continue
+                yield f"data: {json.dumps(event)}\n\n"
+                if event.get("event") in ("done", "error"):
+                    break
+        finally:
+            stream_bus.deregister(run_id)
+
+    return StreamingResponse(
+        generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@app.get("/pipeline/nodes")
+async def get_pipeline_nodes():
+    """Return the v2 pipeline DAG topology for the frontend to render."""
+    return {"nodes": PIPELINE_NODES}
 
 
 @app.post("/explain", response_model=ExplainResponse)

@@ -22,3 +22,6 @@ transformers>=4.30.0
 
 # LangSmith observability (enable with LANGCHAIN_TRACING_V2=true)
 langsmith>=0.1.0
+
+# LangGraph PostgreSQL checkpointing (Prompt 2)
+langgraph-checkpoint-postgres>=2.0.0

@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Eye, Loader2, Workflow } from 'lucide-react';
+import { Plus, Eye, Loader2, Workflow, Zap } from 'lucide-react';
 import { pipelineApi } from '../services/pipelineApi';
 import type { PipelineRun } from '../services/pipelineApi';
+import PipelineProgressLive from '../components/PipelineProgressLive';
+
+const AI_ENGINE = import.meta.env.VITE_AI_ENGINE_URL ?? 'http://localhost:8001';
 
 // ────────────────────────────────────────────────────────────
 // Helpers
@@ -79,6 +82,42 @@ export function PipelinePage() {
   const [formProjectId, setFormProjectId] = useState('');
   const [formJiraStoryId, setFormJiraStoryId] = useState('');
 
+  // V2 live analysis state
+  const [showV2, setShowV2]           = useState(false);
+  const [v2RepoUrl, setV2RepoUrl]     = useState('');
+  const [v2Token, setV2Token]         = useState('');
+  const [v2ProjectId, setV2ProjectId] = useState('1');
+  const [v2CommitSha, setV2CommitSha] = useState('HEAD');
+  const [v2RunId, setV2RunId]         = useState<string | null>(null);
+  const [v2Starting, setV2Starting]   = useState(false);
+  const [v2Error, setV2Error]         = useState('');
+
+  async function handleStartV2(e: React.FormEvent) {
+    e.preventDefault();
+    setV2Starting(true);
+    setV2Error('');
+    setV2RunId(null);
+    try {
+      const res = await fetch(`${AI_ENGINE}/analyze/v2`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project_id: parseInt(v2ProjectId, 10),
+          repo_url: v2RepoUrl,
+          github_token: v2Token,
+          commit_sha: v2CommitSha || 'HEAD',
+        }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setV2RunId(data.run_id);
+    } catch (err: unknown) {
+      setV2Error(err instanceof Error ? err.message : 'Failed to start v2 analysis');
+    } finally {
+      setV2Starting(false);
+    }
+  }
+
   const { data: runs = [], isLoading } = useQuery<PipelineRun[]>({
     queryKey: ['pipeline-runs', filterProjectId],
     queryFn: () => pipelineApi.list(filterProjectId),
@@ -116,13 +155,22 @@ export function PipelinePage() {
             Autonomous 7-stage QA from Jira story to CI/CD
           </p>
         </div>
-        <button
-          onClick={() => setShowForm((v) => !v)}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 transition-colors"
-        >
-          <Plus size={16} />
-          Start New Pipeline
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => { setShowV2((v) => !v); setShowForm(false); }}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800 text-white text-sm font-medium hover:bg-slate-700 transition-colors"
+          >
+            <Zap size={16} />
+            Live Analysis (v2)
+          </button>
+          <button
+            onClick={() => { setShowForm((v) => !v); setShowV2(false); }}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 transition-colors"
+          >
+            <Plus size={16} />
+            Start New Pipeline
+          </button>
+        </div>
       </div>
 
       {/* Inline form */}
@@ -166,6 +214,88 @@ export function PipelinePage() {
             <p className="text-sm text-red-600 mt-3">
               Failed to start pipeline. Please check your inputs and try again.
             </p>
+          )}
+        </div>
+      )}
+
+      {/* V2 Live Analysis panel */}
+      {showV2 && (
+        <div className="bg-slate-900 rounded-xl border border-slate-700 p-6 space-y-4">
+          <h2 className="text-base font-semibold text-white flex items-center gap-2">
+            <Zap size={16} className="text-blue-400" />
+            Live Analysis — v2 (parallel pipeline + SSE streaming)
+          </h2>
+          {!v2RunId ? (
+            <form onSubmit={handleStartV2} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">GitHub Repo URL</label>
+                <input
+                  type="url"
+                  required
+                  value={v2RepoUrl}
+                  onChange={(e) => setV2RepoUrl(e.target.value)}
+                  placeholder="https://github.com/owner/repo"
+                  className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">GitHub Token</label>
+                <input
+                  type="password"
+                  value={v2Token}
+                  onChange={(e) => setV2Token(e.target.value)}
+                  placeholder="ghp_… (optional for public repos)"
+                  className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Project ID</label>
+                <input
+                  type="number"
+                  min={1}
+                  required
+                  value={v2ProjectId}
+                  onChange={(e) => setV2ProjectId(e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Commit SHA</label>
+                <input
+                  type="text"
+                  value={v2CommitSha}
+                  onChange={(e) => setV2CommitSha(e.target.value)}
+                  placeholder="HEAD or full SHA"
+                  className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="sm:col-span-2 flex items-center gap-3">
+                <button
+                  type="submit"
+                  disabled={v2Starting}
+                  className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-60 transition-colors"
+                >
+                  {v2Starting && <Loader2 size={15} className="animate-spin" />}
+                  Start v2 Analysis
+                </button>
+                {v2Error && <span className="text-sm text-red-400">{v2Error}</span>}
+              </div>
+            </form>
+          ) : (
+            <div className="space-y-3">
+              <PipelineProgressLive
+                runId={v2RunId}
+                onDone={(status) => {
+                  queryClient.invalidateQueries({ queryKey: ['pipeline-runs'] });
+                }}
+              />
+              <button
+                onClick={() => { setV2RunId(null); setV2Error(''); }}
+                className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+              >
+                ← Start another analysis
+              </button>
+            </div>
           )}
         </div>
       )}
